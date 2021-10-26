@@ -9,22 +9,10 @@ addEventListener("fetch", event => {
     }
 })
 
-function base64Encode(buf) {
-    let string = '';
-    (new Uint8Array(buf)).forEach(
-        (byte) => { string += String.fromCharCode(byte) }
-    )
-    return escape(btoa(string))
-}
-
-function arrayBufferToBase64(buffer) {
-    var binary = '';
-    var bytes = new Uint8Array(buffer);
-    var len = bytes.byteLength;
-    for (var i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+function base64Encode(byteArray) {
+    return btoa(Array.from(new Uint8Array(byteArray)).map(val => {
+        return String.fromCharCode(val);
+    }).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/\=/g, '');
 }
 
 async function handleRequest(event) {
@@ -35,10 +23,7 @@ async function handleRequest(event) {
     const encodedBody = base64Encode(body);
 
     const url = new URL("https://dns.paesa.es/dns-query");
-    url.searchParams.append("dns", encodedBody) // "q80BAAABAAAAAAAAA3d3dwdleGFtcGxlA2NvbQAAAQAB"
-
-    const cacheKey = url.toString()
-    console.log(url.toString())
+    url.searchParams.append("dns", encodedBody)
 
     // Best practice is to always use the original request to construct the new request
     // to clone all the attributes. Applying the URL also requires a constructor
@@ -51,7 +36,7 @@ async function handleRequest(event) {
     const attrs = new Request(request, newRequestInit);
     const newRequest = new Request(url.href, attrs);
 
-    // Find the cache key in the cache
+    const cacheKey = url.toString()
     let response = await cache.match(cacheKey)
     if (!response) {
         response = await fetch(newRequest)
