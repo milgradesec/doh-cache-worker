@@ -1,9 +1,9 @@
 name = "doh-cache"
 type = "javascript"
-account_id = "c34eb1b082abb2c3786c4f008b295dd4"
 
 workers_dev = true
-zone_id = "7164b7afd9967d0ac5e29f1321cf3031"
+account_id = ""
+zone_id = ""
 # routes = ["https://dns.paesa.es/dns-query","https://doh.paesa.es/dns-query"]
 
 compatibility_date = "2021-10-26"
