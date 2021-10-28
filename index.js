@@ -23,10 +23,12 @@ async function handleRequest(event) {
 
     // Check if response is cached at edge.
     const cacheKey = url.toString()
+    console.log("Cache key => " + cacheKey)
+    
     let response = await cache.match(cacheKey)
     if (!response) {
         console.log("Response served from origin.")
-        
+
         // Create a GET request from the original POST request. 
         const newRequestInit = {
             method: "GET",
