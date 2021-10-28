@@ -11,7 +11,6 @@ addEventListener("fetch", event => {
 
 async function handleRequest(event) {
     const request = event.request
-    const cache = caches.default
 
     // Base64 encode POST request body.
     const body = await request.arrayBuffer()
@@ -22,9 +21,11 @@ async function handleRequest(event) {
     url.searchParams.append("dns", encodedBody)
 
     // Check if response is cached at edge.
-    const cacheKey = url.toString()
+    // const cacheKey = url.toString()
+    const cacheKey = new Request(url.toString(), request);
+    const cache = caches.default
     console.log("Cache key => " + cacheKey)
-    
+
     let response = await cache.match(cacheKey)
     if (!response) {
         console.log("Response served from origin.")
@@ -39,6 +40,9 @@ async function handleRequest(event) {
 
         // Fetch response from origin.
         response = await fetch(newRequest)
+        response = new Response(response.body, response);
+
+        // Store the fetched response in cache.
         event.waitUntil(cache.put(cacheKey, response.clone()))
     } else {
         console.log("Response served from cache.")
