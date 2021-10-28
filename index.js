@@ -11,7 +11,8 @@ addEventListener("fetch", event => {
 
 async function handleRequest(event) {
     const request = event.request
-
+    const cache = caches.default
+    
     // Base64 encode request body.
     const body = await request.arrayBuffer()
     const encodedBody = base64Encode(body);
@@ -27,7 +28,6 @@ async function handleRequest(event) {
     // Check if response is cached at edge.
     const cacheUrl = new URL(getRequest.url);
     const cacheKey = new Request(cacheUrl.toString(), getRequest);
-    const cache = caches.default
 
     let response = await cache.match(cacheKey)
     if (!response) {
