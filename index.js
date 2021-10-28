@@ -25,7 +25,6 @@ async function handleRequest(event) {
     const getRequest = new Request(url.href, attrs);
 
     // Check if response is cached at edge.
-    // const cacheKey = url.toString()
     const cacheUrl = new URL(getRequest.url);
     const cacheKey = new Request(cacheUrl.toString(), getRequest);
     const cache = caches.default
