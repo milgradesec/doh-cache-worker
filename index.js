@@ -40,9 +40,9 @@ async function handleRequest(event) {
 
         // Fetch response from origin.
         response = await fetch(newRequest)
-        response = new Response(response.body, response);
+        // response = new Response(response.body, response);
 
-        // Store the fetched response in cache.
+        // Store the fetched response in the cache.
         event.waitUntil(cache.put(cacheKey, response.clone()))
     } else {
         console.log("Response served from cache.")
