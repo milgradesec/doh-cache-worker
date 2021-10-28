@@ -26,7 +26,8 @@ async function handleRequest(event) {
 
     // Check if response is cached at edge.
     // const cacheKey = url.toString()
-    const cacheKey = new Request(url.toString(), getRequest);
+    const cacheUrl = new URL(getRequest.url);
+    const cacheKey = new Request(cacheUrl.toString(), getRequest);
     const cache = caches.default
 
     let response = await cache.match(cacheKey)
@@ -35,7 +36,7 @@ async function handleRequest(event) {
 
         // Fetch response from origin.
         response = await fetch(getRequest)
-        // response = new Response(response.body, response);
+        response = new Response(response.body, response);
 
         // Store the fetched response in the cache.
         event.waitUntil(cache.put(cacheKey, response.clone()))
