@@ -1,7 +1,7 @@
 addEventListener("fetch", event => {
     try {
         const request = event.request
-        if (request.method.toUpperCase() === "POST")
+        if (request.method === "POST")
             return event.respondWith(handleRequest(event))
         return event.respondWith(fetch(request))
     } catch (e) {
