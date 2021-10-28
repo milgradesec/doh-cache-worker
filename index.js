@@ -13,34 +13,33 @@ async function handleRequest(event) {
     const request = event.request
 
     // Base64 encode POST request body.
-    const body = await request.arrayBuffer()
+    const body = await request.clone().arrayBuffer()
     const encodedBody = base64Encode(body);
 
     // Create a request URL with encoded body as query parameter.
     const url = new URL("https://dns.paesa.es/dns-query");
     url.searchParams.append("dns", encodedBody)
 
+    // Create a GET request from the original POST request. 
+    const newRequestInit = {
+        method: "GET",
+        body: null,
+    };
+    const attrs = new Request(request, newRequestInit);
+    const getRequest = new Request(url.href, attrs);
+
     // Check if response is cached at edge.
-    const cacheKey = url.toString()
-    // const cacheKey = new Request(url.toString(), request);
+    // const cacheKey = url.toString()
+    const cacheKey = new Request(url.toString(), getRequest);
     const cache = caches.default
-    console.log("Cache key => " + cacheKey)
 
     let response = await cache.match(cacheKey)
     if (!response) {
         console.log("Response served from origin.")
 
-        // Create a GET request from the original POST request. 
-        const newRequestInit = {
-            method: "GET",
-            body: null,
-        };
-        const attrs = new Request(request, newRequestInit);
-        const newRequest = new Request(url.href, attrs);
-
         // Fetch response from origin.
-        response = await fetch(newRequest)
-        response = new Response(response.body, response);
+        response = await fetch(getRequest)
+        // response = new Response(response.body, response);
 
         // Store the fetched response in the cache.
         event.waitUntil(cache.put(cacheKey, response.clone()))
