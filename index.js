@@ -13,7 +13,7 @@ async function handleRequest(event) {
     const request = event.request
 
     // Base64 encode POST request body.
-    const body = await request.clone().arrayBuffer()
+    const body = await request.arrayBuffer()
     const encodedBody = base64Encode(body);
 
     // Create a request URL with encoded body as query parameter.
@@ -21,11 +21,7 @@ async function handleRequest(event) {
     url.searchParams.append("dns", encodedBody)
 
     // Create a GET request from the original POST request. 
-    const newRequestInit = {
-        method: "GET",
-        body: null,
-    };
-    const attrs = new Request(request, newRequestInit);
+    const attrs = new Request(request, { method: "GET", body: null, });
     const getRequest = new Request(url.href, attrs);
 
     // Check if response is cached at edge.
