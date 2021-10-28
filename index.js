@@ -12,7 +12,7 @@ addEventListener("fetch", event => {
 async function handleRequest(event) {
     const request = event.request
 
-    // Base64 encode POST request body.
+    // Base64 encode request body.
     const body = await request.arrayBuffer()
     const encodedBody = base64Encode(body);
 
