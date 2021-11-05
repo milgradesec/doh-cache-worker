@@ -7,6 +7,10 @@
 
 🚀 Running in production at **<https://dns.paesa.es/dns-query>**
 
+## How it Works
+
+`doh-cache` converts a DoH POST request to a GET request and uses the Cache API to store the response in Cloudflare's cache.
+
 ## License
 
 MIT License
