@@ -8,7 +8,7 @@ on:
       days:
         description: "Number of days."
         required: true
-        default: 15
+        default: 30
 
 jobs:
   cleanup:
@@ -20,4 +20,4 @@ jobs:
         uses: Mattraks/delete-workflow-runs@v1.2.3
         with:
           repository: ${{ github.repository }}
-          retain_days: 15
+          retain_days: 30
