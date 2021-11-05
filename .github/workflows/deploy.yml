@@ -3,6 +3,8 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches: [main]
+    paths:
+      - "index.js"
 
 jobs:
   deploy:
