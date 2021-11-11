@@ -31,20 +31,21 @@ async function handleRequest(event) {
 
     let response = await cache.match(cacheKey)
     if (!response) {
-        console.log("Response served from origin.")
-
         // Fetch response from origin.
         response = await fetch(getRequest)
         response = new Response(response.body, response);
 
         // Store the fetched response in the cache.
         event.waitUntil(cache.put(cacheKey, response.clone()))
-    } else {
-        console.log("Response served from cache.")
     }
     return response
 }
 
+/**
+ * Encodes a binary ByteArray as a Base64 encoded string
+ * @param {Array} byteArray 
+ * @returns {String}
+ */
 function base64Encode(byteArray) {
     return btoa(Array.from(new Uint8Array(byteArray)).map(val => {
         return String.fromCharCode(val);
