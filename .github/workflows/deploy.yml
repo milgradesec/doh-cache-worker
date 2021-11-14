@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "index.js"
+      - "wrangler.toml"
 
 jobs:
   deploy:
