@@ -22,23 +22,16 @@ async function handleRequest(event) {
     url.searchParams.append("dns", encodedBody)
 
     // Create a GET request from the original POST request. 
-    const attrs = new Request(request, { method: "GET", body: null, });
-    const getRequest = new Request(url.href, attrs);
+    const newRequest = new Request(url.href, {
+        method: "GET",
+        body: null,
+    });
 
-    // Check if response is cached at edge.
-    const cacheUrl = new URL(getRequest.url);
-    const cacheKey = new Request(cacheUrl.toString(), getRequest);
-
-    let response = await cache.match(cacheKey)
-    if (!response) {
-        // Fetch response from origin.
-        response = await fetch(getRequest)
-        response = new Response(response.body, response);
-
-        // Store the fetched response in the cache.
-        event.waitUntil(cache.put(cacheKey, response.clone()))
-    }
-    return response
+    return await fetch(newRequest, {
+        cf: {
+            cacheEverything: true,
+        },
+    })
 }
 
 /**
