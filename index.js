@@ -11,7 +11,6 @@ addEventListener("fetch", event => {
 
 async function handleRequest(event) {
     const request = event.request
-    const cache = caches.default
 
     // Base64 encode request body.
     const body = await request.arrayBuffer()
