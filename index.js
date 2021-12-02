@@ -19,6 +19,7 @@ async function handleRequest(request) {
     const newRequest = new Request(url.href, {
         method: "GET",
         body: null,
+        redirect: "error"
     });
 
     return await fetch(newRequest, {
