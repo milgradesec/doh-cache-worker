@@ -1,18 +1,22 @@
 name: Lint
 
-on: 
+on:
   push:
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: Install modules
-      run: yarn
-      
-    - name: Run ESLint
-      run: yarn lint
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16
+          
+      - name: Install modules
+        run: yarn
+
+      - name: Run ESLint
+        run: yarn lint
