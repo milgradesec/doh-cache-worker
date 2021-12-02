@@ -28,7 +28,6 @@ async function handleRequest(request) {
     })
 }
 
-
 function base64Encode(byteArray) {
     return btoa(Array.from(new Uint8Array(byteArray)).map(val => {
         return String.fromCharCode(val);
