@@ -16,7 +16,7 @@ jobs:
           node-version: 16
 
       - name: Install modules
-        run: yarn
+        run: yarn add eslint
 
       - name: Run ESLint
-        run: yarn run lint
+        run: yarn run eslint index.js
