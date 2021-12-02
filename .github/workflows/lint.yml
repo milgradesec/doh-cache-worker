@@ -15,4 +15,4 @@ jobs:
 
       - uses: actionsx/prettier@v2
         with:
-          args: --single-quote --list-different index.js
+          args: --single-quote --check index.js
