@@ -1,17 +1,12 @@
 addEventListener("fetch", event => {
-    try {
-        const request = event.request
-        if (request.method === "POST")
-            return event.respondWith(handleRequest(event))
-        return event.respondWith(fetch(request))
-    } catch (e) {
-        return event.respondWith(new Response("Error thrown " + e.message))
-    }
-})
-
-async function handleRequest(event) {
     const request = event.request
 
+    if (request.method === "POST")
+        return event.respondWith(handleRequest(request))
+    return event.respondWith(fetch(request))
+})
+
+async function handleRequest(request) {
     // Base64 encode request body.
     const body = await request.arrayBuffer()
     const encodedBody = base64Encode(body);
