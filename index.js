@@ -1,6 +1,7 @@
 addEventListener("fetch", event => {
     const request = event.request
 
+    // Only handle POST requests.
     if (request.method === "POST")
         return event.respondWith(handleRequest(request))
     return event.respondWith(fetch(request))
