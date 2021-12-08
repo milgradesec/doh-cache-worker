@@ -10,7 +10,7 @@
 
 ## How it Works
 
-`doh-cache` converts a DoH POST request to a GET request and uses the Cache API to store the response in Cloudflare's cache.
+`doh-cache` transforms a DoH POST request to a DoH GET request and uses the Cache API to store the response in Cloudflare's cache. Drastically reducing response latency and server costs by using Cloudflare global network to serve cached responses.
 
 ## License
 
