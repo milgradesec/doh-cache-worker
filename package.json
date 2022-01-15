@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "name": "doh-cache",
+  "version": "1.0.0",
+  "description": "A Cloudflare Worker to make DNS over HTTPS requests cacheable at edge.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write '**/*.{js,css,json,md}'"
+  },
+  "author": "milgradesec <38557680+milgradesec@users.noreply.github.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "prettier": "^2.4.1"
+  }
+}
