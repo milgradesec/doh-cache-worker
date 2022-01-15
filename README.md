@@ -1,7 +1,6 @@
 # ⚡ doh-cache ⚡
 
 [![Deploy to Cloudflare Workers](https://github.com/milgradesec/cfworker-doh-cache/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/milgradesec/cfworker-doh-cache/actions/workflows/deploy.yml)
-[![CodeQL](https://github.com/milgradesec/cfworker-doh-cache/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/milgradesec/cfworker-doh-cache/actions/workflows/codeql-analysis.yml)
 ![GitHub](https://img.shields.io/github/license/milgradesec/cfworker-doh-cache)
 
 👷 `doh-cache` is a Cloudflare Worker to make DNS over HTTPS requests cacheable at edge.
