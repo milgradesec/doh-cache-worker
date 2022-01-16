@@ -13,7 +13,7 @@ async function handleRequest(request) {
     const encodedBody = base64Encode(body);
 
     // Create a request URL with encoded body as query parameter.
-    const url = new URL("https://dns.paesa.es/dns-query");
+    const url = new URL(`https://${DOH_ENDPOINT}`);
     url.searchParams.append("dns", encodedBody)
 
     // Create a GET request from the original POST request. 
