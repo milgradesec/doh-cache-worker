@@ -3,7 +3,7 @@ name = "doh-cache"
 main = "src/index.js"
 
 route = "https://dns.paesa.es/dns-query"
-compatibility_date = "2021-10-26"
+compatibility_date = "2022-05-12"
 
 [vars]
 DOH_ENDPOINT = "dns.paesa.es/dns-query"
