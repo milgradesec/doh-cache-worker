@@ -1,5 +1,6 @@
 name = "doh-cache"
-type = "javascript"
+
+main = "src/index.js"
 
 route = "https://dns.paesa.es/dns-query"
 compatibility_date = "2021-10-26"

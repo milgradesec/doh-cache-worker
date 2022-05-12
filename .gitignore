@@ -9,4 +9,6 @@ worker/
 node_modules/
 .cargo-ok
 .vscode/
-.dccache
+*-lock.*
+*.lock
+*.log

@@ -1,3 +1,9 @@
+// export default {
+//     async fetch(request, env, context) {
+//       return handleRequest(request, env)
+//     },
+//   };
+
 addEventListener("fetch", event => {
     const request = event.request
 
