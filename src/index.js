@@ -4,6 +4,7 @@
 //     },
 //   };
 
+
 addEventListener("fetch", event => {
     const request = event.request
 
