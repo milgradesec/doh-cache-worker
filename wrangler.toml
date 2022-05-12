@@ -2,7 +2,7 @@ name = "doh-cache"
 
 main = "src/index.js"
 
-route = "https://dns.paesa.es/dns-query"
+route = { pattern = "https://dns.paesa.es/dns-query", zone_id = "7164b7afd9967d0ac5e29f1321cf3031" }
 compatibility_date = "2022-05-12"
 
 [vars]
