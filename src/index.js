@@ -1,26 +1,21 @@
-// export default {
-//     async fetch(request, env, context) {
-//       return handleRequest(request, env)
-//     },
-//   };
+export default {
+    async fetch(request, env) {
 
+        // Only handle POST requests.
+        if (request.method === "POST") {
+            return handleRequest(request, env)
+        }
+        return fetch(request)
+    },
+};
 
-addEventListener("fetch", event => {
-    const request = event.request
-
-    // Only handle POST requests.
-    if (request.method === "POST")
-        return event.respondWith(handleRequest(request))
-    return event.respondWith(fetch(request))
-})
-
-async function handleRequest(request) {
+async function handleRequest(request, env) {
     // Base64 encode request body.
     const body = await request.arrayBuffer()
     const encodedBody = base64Encode(body);
 
     // Create a request URL with encoded body as query parameter.
-    const url = new URL(`https://${DOH_ENDPOINT}`);
+    const url = new URL(`https://${env.DOH_ENDPOINT}`);
     url.searchParams.append("dns", encodedBody)
 
     // Create a GET request from the original POST request. 
