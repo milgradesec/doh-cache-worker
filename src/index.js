@@ -1,6 +1,5 @@
 export default {
     async fetch(request, env) {
-
         // Only handle POST requests.
         if (request.method === "POST") {
             return handleRequest(request, env)
