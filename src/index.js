@@ -18,13 +18,13 @@ async function handleRequest(request, env) {
     url.searchParams.append("dns", encodedBody)
 
     // Create a GET request from the original POST request. 
-    const newRequest = new Request(url.href, {
+    const getRequest = new Request(url.href, {
         method: "GET",
         body: null,
     });
 
     // Fetch response from origin server.
-    return await fetch(newRequest, {
+    return await fetch(getRequest, {
         cf: {
             cacheEverything: true,
         },
