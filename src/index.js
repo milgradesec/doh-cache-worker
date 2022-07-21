@@ -1,13 +1,19 @@
 export default {
     async fetch(request, env) {
-        // Only handle POST requests.
-        if (request.method === "POST") {
-            return handleRequest(request, env)
+        // Only need to handle POST requests.
+        if (request.method != "POST") {
+            return new Response("Bad request", { status: 400 })
         }
-        return fetch(request)
+        return handleRequest(request, env)
     },
 };
 
+/**
+ * Handle request.
+ * 
+ * @param {Request} request 
+ * @param {*} env 
+ */
 async function handleRequest(request, env) {
     // Base64 encode request body.
     const body = await request.arrayBuffer()
@@ -31,6 +37,11 @@ async function handleRequest(request, env) {
     })
 }
 
+/**
+ * Encodes with base64.
+ * 
+ * @param {ArrayBuffer} byteArray
+ */
 function base64Encode(byteArray) {
     return btoa(Array.from(new Uint8Array(byteArray)).map(val => {
         return String.fromCharCode(val);
