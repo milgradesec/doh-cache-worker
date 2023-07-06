@@ -11,6 +11,6 @@
   "author": "milgradesec <38557680+milgradesec@users.noreply.github.com>",
   "license": "MIT",
   "devDependencies": {
-    "prettier": "^2.4.1"
+    "prettier": "^3.0.0"
   }
 }
