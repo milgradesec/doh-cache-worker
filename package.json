@@ -6,7 +6,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "format": "prettier --write '**/*.{js,css,json,md}'"
+    "format": "prettier --write '**/*.{js,ts,css,json,md}'"
   },
   "author": "milgradesec <38557680+milgradesec@users.noreply.github.com>",
   "license": "MIT",
