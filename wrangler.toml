@@ -1,7 +1,5 @@
 name = "doh-cache"
 main = "src/index.ts"
-compatibility_date = "2022-05-12"
-usage_model = "bundled"
 compatibility_date = "2025-05-05"
 
 route = "https://dns.paesa.es/dns-query"
