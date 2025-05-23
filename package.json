@@ -12,8 +12,8 @@
   "author": "milgradesec <38557680+milgradesec@users.noreply.github.com>",
   "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240117.0",
-    "prettier": "^3.2.4",
-    "typescript": "^5.3.3"
+    "@cloudflare/workers-types": "^4.20250522.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
   }
 }
