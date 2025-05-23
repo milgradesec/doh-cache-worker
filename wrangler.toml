@@ -6,3 +6,6 @@ route = "https://dns.paesa.es/dns-query"
 
 [vars]
 DOH_ENDPOINT = "dns.paesa.es/dns-query"
+
+[placement]
+mode = "smart"
