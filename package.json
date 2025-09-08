@@ -2,7 +2,7 @@
   "private": true,
   "name": "doh-cache",
   "version": "1.0.0",
-  "description": "A Cloudflare Worker to make DNS over HTTPS requests cacheable at edge.",
+  "description": "A Cloudflare Worker that makes DNS-over-HTTPS (DoH) requests cacheable at edge.",
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
