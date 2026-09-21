@@ -13,7 +13,7 @@
   "license": "MIT",
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260903.1",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.8",
     "typescript": "^7.0.2",
     "wrangler": "^4.131.0"
   }
