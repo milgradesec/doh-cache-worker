@@ -11,7 +11,13 @@ export default {
       if (request.method === 'POST') {
         return await handleRequest(request, env);
       }
-      return await fetch(request);
+      if (request.method === 'GET') {
+        const url = new URL(request.url);
+        url.protocol = 'https:';
+        url.hostname = env.DOH_ENDPOINT;
+        return await fetch(new Request(url.href, request));
+      }
+      return new Response(null, { status: 405 });
     } catch {
       return new Response(null, { status: 502 });
     }
