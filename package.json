@@ -12,9 +12,9 @@
   "author": "milgradesec <38557680+milgradesec@users.noreply.github.com>",
   "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260919.1",
-    "prettier": "^3.9.8",
+    "@cloudflare/workers-types": "^5.20260926.1",
+    "prettier": "^3.9.9",
     "typescript": "^7.0.2",
-    "wrangler": "^4.134.0"
+    "wrangler": "^4.141.0"
   }
 }
