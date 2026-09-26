@@ -5,7 +5,7 @@
   "description": "A Cloudflare Worker that makes DNS-over-HTTPS (DoH) requests cacheable at edge.",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --experimental-strip-types --test",
     "fmt": "prettier --write '**/*.{js,ts,css,json,md}'",
     "deploy": "wrangler deploy"
   },

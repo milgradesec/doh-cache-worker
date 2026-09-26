@@ -23,10 +23,9 @@ from `.github/workflows/deploy.yml` whenever changes reach `main`.
 - `npm run deploy` publishes with Wrangler; normally rely on the GitHub Actions
   workflow after merging to `main` rather than deploying from a local machine.
 
-`npm test` is currently a placeholder and fails intentionally; no test runner
-or coverage threshold is configured. Add focused Worker tests alongside a test
-tooling change, using descriptive names such as
-`converts a DoH POST body to a cacheable GET request`.
+`npm test` runs focused Worker tests with Node's built-in test runner. Add
+descriptive cases for changes to DNS handling, including body boundaries and
+forwarding behavior.
 
 ## Coding Style & Naming Conventions
 
