@@ -17,10 +17,7 @@ On a miss, the worker fetches from the upstream DoH resolver and returns its
 response. Whether Cloudflare stores that response depends on the origin's
 cache headers.
 
-With Node.js 26, run `npm test` and `npx tsc --noEmit` to check the
-Worker locally. The
-[verification notes](VERIFICATION.md) describe the properties checked and
-their limits.
+With Node.js 26, run `npm test` and `npx tsc --noEmit` to check the Worker locally.
 
 ## License
 
