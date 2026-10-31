@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fc from 'fast-check';
 import worker from '../src/index.ts';
+
+const cacheableBytes = fc.uint8Array({ maxLength: 12_000, size: 'max' });
 
 function post(bytes, headers = {}) {
   return new Request('https://dns.paesa.es/dns-query', {
@@ -21,6 +24,46 @@ async function dispatch(request, origin, endpoint = 'dns.paesa.es/dns-query') {
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+async function assertConverted(
+  request,
+  bytes,
+  endpoint = 'dns.paesa.es/dns-query',
+) {
+  const originResponse = new Response('origin response');
+  let calls = 0;
+  let outbound;
+  let options;
+  const response = await dispatch(
+    request,
+    (forwarded, init) => {
+      calls++;
+      outbound = forwarded;
+      options = init;
+      return Promise.resolve(originResponse);
+    },
+    endpoint,
+  );
+
+  assert.equal(calls, 1);
+  assert.strictEqual(response, originResponse);
+  assert.equal(outbound.method, 'GET');
+  assert.equal(outbound.body, null);
+  assert.deepEqual(
+    [...outbound.headers],
+    [['accept', 'application/dns-message']],
+  );
+  assert.deepEqual(options, { cf: { cacheEverything: true } });
+
+  const encoded = new URL(outbound.url).searchParams.get('dns');
+  assert.match(encoded, /^[A-Za-z0-9_-]*$/);
+  assert.equal(encoded, Buffer.from(bytes).toString('base64url'));
+  assert.deepEqual(Buffer.from(encoded, 'base64url'), Buffer.from(bytes));
+  const expectedUrl = new URL(`https://${endpoint}`);
+  expectedUrl.searchParams.set('dns', Buffer.from(bytes).toString('base64url'));
+  assert.equal(outbound.url, expectedUrl.href);
+  assert.ok(outbound.url.length <= 16 * 1024);
 }
 
 test('converts the RFC 8484 POST example to its exact GET representation', async () => {
@@ -50,36 +93,29 @@ test('converts the RFC 8484 POST example to its exact GET representation', async
   assert.deepEqual(options, { cf: { cacheEverything: true } });
 });
 
-test('preserves arbitrary bytes in base64url without padding', async () => {
+test('preserves binary boundary vectors in base64url without padding', async () => {
   const cases = [
     Buffer.alloc(0),
     Buffer.from([0]),
     Buffer.from([255, 254]),
     Buffer.from(Array.from({ length: 256 }, (_, index) => index)),
+    Buffer.alloc(11_999, 255),
+    Buffer.alloc(12_000, 255),
   ];
-  let seed = 0x12345678;
-  for (let index = 0; index < 120; index++) {
-    const length = (index * 97) % 12_001;
-    const bytes = Buffer.alloc(length);
-    for (let offset = 0; offset < length; offset++) {
-      seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
-      bytes[offset] = seed >>> 24;
-    }
-    cases.push(bytes);
-  }
 
   for (const bytes of cases) {
-    let outbound;
-    await dispatch(post(bytes), (request) => {
-      outbound = request;
-      return Promise.resolve(new Response());
-    });
-    const encoded = new URL(outbound.url).searchParams.get('dns');
-    assert.equal(outbound.method, 'GET');
-    assert.equal(encoded, bytes.toString('base64url'));
-    assert.deepEqual(Buffer.from(encoded, 'base64url'), bytes);
-    assert.ok(outbound.url.length <= 16 * 1024);
+    await assertConverted(post(bytes), bytes);
   }
+  await assertConverted(post(undefined), Buffer.alloc(0));
+});
+
+test('preserves arbitrary bytes in base64url without padding', async () => {
+  await fc.assert(
+    fc.asyncProperty(cacheableBytes, async (bytes) => {
+      await assertConverted(post(bytes), bytes);
+    }),
+    { numRuns: 100 },
+  );
 });
 
 test('keeps the largest cacheable body within the URL limit', async () => {
