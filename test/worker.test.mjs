@@ -247,8 +247,6 @@ test('uses Content-Length to forward an oversized POST immediately', async () =>
   const originResponse = new Response('origin response');
   let calls = 0;
   let outbound;
-  let releasedBytes = 0;
-  let releasedBytesAtOrigin;
   let forwardedBytes;
   const timer = setTimeout(() => {
     controller.error(
@@ -259,9 +257,7 @@ test('uses Content-Length to forward an oversized POST immediately', async () =>
     const response = await dispatch(request, async (forwarded) => {
       calls++;
       outbound = forwarded;
-      releasedBytesAtOrigin = releasedBytes;
       controller.enqueue(bytes);
-      releasedBytes += bytes.length;
       controller.close();
       forwardedBytes = Buffer.from(await forwarded.arrayBuffer());
       return originResponse;
@@ -269,7 +265,6 @@ test('uses Content-Length to forward an oversized POST immediately', async () =>
     assert.equal(calls, 1);
     assert.strictEqual(outbound, request);
     assert.strictEqual(response, originResponse);
-    assert.equal(releasedBytesAtOrigin, 0);
     assert.deepEqual(forwardedBytes, bytes);
   } finally {
     clearTimeout(timer);
