@@ -206,28 +206,9 @@ test('preserves arbitrary bytes in base64url without padding', async () => {
   );
 });
 
-test('keeps the largest cacheable body within the URL limit', async () => {
-  let outbound;
-  await dispatch(post(Buffer.alloc(12_000, 255)), (request) => {
-    outbound = request;
-    return Promise.resolve(new Response());
-  });
-  assert.equal(outbound.method, 'GET');
-  assert.ok(outbound.url.length <= 16 * 1024);
-});
-
 test('forwards an oversized POST without changing its bytes', async () => {
   const bytes = Buffer.alloc(12_001, 255);
-  let outbound;
-  let options;
-  await dispatch(post(bytes), async (request, init) => {
-    outbound = request;
-    options = init;
-    assert.deepEqual(Buffer.from(await request.arrayBuffer()), bytes);
-    return new Response();
-  });
-  assert.equal(outbound.method, 'POST');
-  assert.equal(options, undefined);
+  await assertForwarded(post(bytes), bytes);
 });
 
 test('forwards a streamed POST after crossing the cacheable size limit', async () => {
@@ -244,23 +225,113 @@ test('forwards a streamed POST after crossing the cacheable size limit', async (
     }),
     duplex: 'half',
   });
-  let outbound;
-  await dispatch(request, async (forwarded) => {
-    outbound = forwarded;
-    assert.deepEqual(Buffer.from(await forwarded.arrayBuffer()), bytes);
-    return new Response();
-  });
-  assert.strictEqual(outbound, request);
+  await assertForwarded(request, bytes);
 });
 
 test('uses Content-Length to forward an oversized POST immediately', async () => {
-  const request = post(Buffer.from([1]), { 'content-length': '12001' });
-  let outbound;
-  await dispatch(request, (forwarded) => {
-    outbound = forwarded;
-    return Promise.resolve(new Response());
+  const bytes = Buffer.from([1]);
+  let controller;
+  const request = new Request('https://dns.paesa.es/dns-query', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/dns-message',
+      'content-length': '12001',
+    },
+    body: new ReadableStream({
+      start(streamController) {
+        controller = streamController;
+      },
+    }),
+    duplex: 'half',
   });
-  assert.strictEqual(outbound, request);
+  const originResponse = new Response('origin response');
+  let calls = 0;
+  let outbound;
+  let releasedBytes = 0;
+  let releasedBytesAtOrigin;
+  let forwardedBytes;
+  const timer = setTimeout(() => {
+    controller.error(
+      new Error('origin was not reached before reading the body'),
+    );
+  }, 2_000);
+  try {
+    const response = await dispatch(request, async (forwarded) => {
+      calls++;
+      outbound = forwarded;
+      releasedBytesAtOrigin = releasedBytes;
+      controller.enqueue(bytes);
+      releasedBytes += bytes.length;
+      controller.close();
+      forwardedBytes = Buffer.from(await forwarded.arrayBuffer());
+      return originResponse;
+    });
+    assert.equal(calls, 1);
+    assert.strictEqual(outbound, request);
+    assert.strictEqual(response, originResponse);
+    assert.equal(releasedBytesAtOrigin, 0);
+    assert.deepEqual(forwardedBytes, bytes);
+  } finally {
+    clearTimeout(timer);
+    controller.error(new Error('test complete'));
+    await request.body.cancel().catch(() => {});
+  }
+});
+
+test('forwards a lazily produced oversized stream before buffering all of it', async () => {
+  const chunk = Buffer.alloc(6_000, 123);
+  const totalChunks = 100;
+  let producedChunks = 0;
+  let controller;
+  const request = new Request('https://dns.paesa.es/dns-query', {
+    method: 'POST',
+    headers: { 'content-type': 'application/dns-message' },
+    body: new ReadableStream({
+      start(streamController) {
+        controller = streamController;
+      },
+      pull(streamController) {
+        producedChunks++;
+        streamController.enqueue(chunk);
+        if (producedChunks === totalChunks) {
+          streamController.close();
+        }
+      },
+    }),
+    duplex: 'half',
+  });
+  const originResponse = new Response('origin response');
+  let calls = 0;
+  let outbound;
+  let producedChunksAtOrigin;
+  let forwardedBytes;
+  const timer = setTimeout(() => {
+    controller.error(new Error('oversized stream did not reach the origin'));
+  }, 2_000);
+  try {
+    const response = await dispatch(request, async (forwarded) => {
+      calls++;
+      outbound = forwarded;
+      producedChunksAtOrigin = producedChunks;
+      forwardedBytes = Buffer.from(await forwarded.arrayBuffer());
+      return originResponse;
+    });
+    assert.equal(calls, 1);
+    assert.strictEqual(outbound, request);
+    assert.strictEqual(response, originResponse);
+    assert.ok(
+      producedChunksAtOrigin < totalChunks,
+      `all ${producedChunksAtOrigin} chunks were buffered before forwarding`,
+    );
+    assert.deepEqual(
+      forwardedBytes,
+      Buffer.alloc(chunk.length * totalChunks, 123),
+    );
+  } finally {
+    clearTimeout(timer);
+    controller.error(new Error('test complete'));
+    await request.body.cancel().catch(() => {});
+  }
 });
 
 test('forwards a POST when the configured endpoint makes the URL too long', async () => {
@@ -298,6 +369,54 @@ test('forwards POSTs whose HTTP semantics cannot be safely normalized', async ()
     });
     assert.strictEqual(outbound, request);
     assert.equal(outbound.method, 'POST');
+  }
+});
+
+test('forwards the original POST when Content-Type is missing', async () => {
+  const bytes = Buffer.from([0, 255]);
+  const request = new Request('https://dns.paesa.es/dns-query', {
+    method: 'POST',
+    body: bytes,
+  });
+  assert.equal(request.headers.has('content-type'), false);
+  await assertForwarded(request, bytes);
+});
+
+test('forwards requests excluded by headers without reading errored bodies', async () => {
+  for (const headers of [
+    { 'content-type': 'application/json' },
+    { accept: 'application/dns-json' },
+    { authorization: '' },
+    { cookie: '' },
+    { 'cache-control': '' },
+    { pragma: '' },
+    { 'content-length': '12001' },
+  ]) {
+    const request = new Request('https://dns.paesa.es/dns-query', {
+      method: 'POST',
+      headers: { 'content-type': 'application/dns-message', ...headers },
+      body: new ReadableStream({
+        start(controller) {
+          controller.error(new Error('body must not be inspected'));
+        },
+      }),
+      duplex: 'half',
+    });
+    const originResponse = new Response('origin response');
+    let calls = 0;
+    let outbound;
+    let options;
+    const response = await dispatch(request, (forwarded, init) => {
+      calls++;
+      outbound = forwarded;
+      options = init;
+      return Promise.resolve(originResponse);
+    });
+    assert.equal(calls, 1);
+    assert.strictEqual(outbound, request);
+    assert.strictEqual(response, originResponse);
+    assert.equal(options, undefined);
+    assert.equal(request.bodyUsed, false);
   }
 });
 
@@ -341,6 +460,83 @@ test('forwards non-POST requests and returns 502 on upstream failure', async () 
   });
   assert.equal(failed.status, 502);
   assert.equal(await failed.text(), '');
+});
+
+test('returns an empty 502 when a GET or HEAD origin asynchronously rejects', async () => {
+  for (const method of ['GET', 'HEAD']) {
+    const request = new Request('https://dns.paesa.es/dns-query', { method });
+    let calls = 0;
+    let outbound;
+    const response = await dispatch(request, async (forwarded) => {
+      calls++;
+      outbound = forwarded;
+      await Promise.resolve();
+      throw new Error('origin unavailable');
+    });
+    assert.equal(calls, 1);
+    assert.strictEqual(outbound, request);
+    assert.equal(response.status, 502);
+    assert.equal(await response.text(), '');
+  }
+});
+
+test('returns an empty 502 on a body read error without an origin request', async () => {
+  const request = new Request('https://dns.paesa.es/dns-query', {
+    method: 'POST',
+    headers: { 'content-type': 'application/dns-message' },
+    body: new ReadableStream({
+      start(controller) {
+        controller.error(new Error('body read failed'));
+      },
+    }),
+    duplex: 'half',
+  });
+  let calls = 0;
+  const response = await dispatch(request, () => {
+    calls++;
+    return Promise.resolve(new Response('unexpected origin request'));
+  });
+  assert.equal(calls, 0);
+  assert.equal(response.status, 502);
+  assert.equal(await response.text(), '');
+});
+
+test('preserves origin statuses, bodies, and headers after conversion or forwarding', async () => {
+  for (const status of [204, 304, 404, 429, 500, 503]) {
+    for (const converted of [true, false]) {
+      const request = post(
+        Buffer.from([0, 255]),
+        converted ? {} : { cookie: '' },
+      );
+      const bytes =
+        status === 204 || status === 304 ? null : Buffer.from([0, 255]);
+      const headers = {
+        'cache-control': 'private, max-age=60',
+        'content-type': 'application/dns-message',
+        'x-origin': 'unchanged',
+      };
+      const originResponse = new Response(bytes, { status, headers });
+      let calls = 0;
+      let outbound;
+      const response = await dispatch(request, (forwarded) => {
+        calls++;
+        outbound = forwarded;
+        return Promise.resolve(originResponse);
+      });
+      assert.equal(calls, 1);
+      assert.equal(outbound.method, converted ? 'GET' : 'POST');
+      if (!converted) {
+        assert.strictEqual(outbound, request);
+      }
+      assert.strictEqual(response, originResponse);
+      assert.equal(response.status, status);
+      assert.deepEqual([...response.headers], [...new Headers(headers)]);
+      assert.deepEqual(
+        Buffer.from(await response.arrayBuffer()),
+        bytes ?? Buffer.alloc(0),
+      );
+    }
+  }
 });
 
 test('preserves streamed boundary bytes across repeated cuts', async () => {
