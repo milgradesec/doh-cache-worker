@@ -4,6 +4,21 @@ import fc from 'fast-check';
 import worker from '../src/index.ts';
 
 const cacheableBytes = fc.uint8Array({ maxLength: 12_000, size: 'max' });
+const oversizedBytes = fc.uint8Array({
+  minLength: 12_001,
+  maxLength: 12_288,
+  size: 'max',
+});
+const smallBytes = fc.uint8Array({ maxLength: 64, size: 'max' });
+const streamCuts = fc.array(fc.integer({ min: 0, max: 12_000 }), {
+  maxLength: 7,
+  size: 'max',
+});
+const headerValue = fc
+  .array(fc.constantFrom('a', 'b', '0', '1', ' ', '=', ';', '-', '_'), {
+    maxLength: 24,
+  })
+  .map((characters) => characters.join(''));
 
 function post(bytes, headers = {}) {
   return new Request('https://dns.paesa.es/dns-query', {
@@ -14,6 +29,50 @@ function post(bytes, headers = {}) {
     },
     body: bytes,
   });
+}
+
+function streamedPost(bytes, cuts) {
+  return new Request('https://dns.paesa.es/dns-query', {
+    method: 'POST',
+    headers: { 'content-type': 'application/dns-message' },
+    body: new ReadableStream({
+      start(controller) {
+        let offset = 0;
+        for (const cut of [...cuts].sort((left, right) => left - right)) {
+          const end = Math.min(cut, bytes.length);
+          controller.enqueue(bytes.subarray(offset, end));
+          offset = end;
+        }
+        controller.enqueue(bytes.subarray(offset));
+        controller.close();
+      },
+    }),
+    duplex: 'half',
+  });
+}
+
+function mediaTypeVariants(value) {
+  return fc
+    .tuple(
+      fc.array(fc.boolean(), {
+        minLength: value.length,
+        maxLength: value.length,
+      }),
+      fc.constantFrom('', ' ', '\t'),
+      fc.constantFrom('', ' ', '\t'),
+    )
+    .map(([uppercase, leading, trailing]) => {
+      const letters = [...value].map((letter, index) =>
+        uppercase[index] ? letter.toUpperCase() : letter,
+      );
+      return leading + letters.join('') + trailing;
+    });
+}
+
+function endpointWithUrlLength(bytes, length) {
+  const url = new URL('https://example.com/');
+  url.searchParams.set('dns', Buffer.from(bytes).toString('base64url'));
+  return `example.com/${'x'.repeat(length - url.href.length)}`;
 }
 
 async function dispatch(request, origin, endpoint = 'dns.paesa.es/dns-query') {
@@ -64,6 +123,35 @@ async function assertConverted(
   expectedUrl.searchParams.set('dns', Buffer.from(bytes).toString('base64url'));
   assert.equal(outbound.url, expectedUrl.href);
   assert.ok(outbound.url.length <= 16 * 1024);
+}
+
+async function assertForwarded(
+  request,
+  bytes,
+  endpoint = 'dns.paesa.es/dns-query',
+) {
+  const originResponse = new Response('origin response');
+  let calls = 0;
+  let outbound;
+  let options;
+  let forwardedBytes;
+  const response = await dispatch(
+    request,
+    async (forwarded, init) => {
+      calls++;
+      outbound = forwarded;
+      options = init;
+      forwardedBytes = Buffer.from(await forwarded.arrayBuffer());
+      return originResponse;
+    },
+    endpoint,
+  );
+
+  assert.equal(calls, 1);
+  assert.strictEqual(response, originResponse);
+  assert.strictEqual(outbound, request);
+  assert.equal(options, undefined);
+  assert.deepEqual(forwardedBytes, Buffer.from(bytes));
 }
 
 test('converts the RFC 8484 POST example to its exact GET representation', async () => {
@@ -253,4 +341,233 @@ test('forwards non-POST requests and returns 502 on upstream failure', async () 
   });
   assert.equal(failed.status, 502);
   assert.equal(await failed.text(), '');
+});
+
+test('preserves streamed boundary bytes across repeated cuts', async () => {
+  const cases = [
+    [Buffer.alloc(0), [0, 0]],
+    [Buffer.from([0, 255, 1]), [0, 2, 2]],
+    [Buffer.alloc(12_000, 255), [0, 0, 6_000, 12_000, 12_000]],
+    [Buffer.alloc(12_001, 255), [12_000]],
+    [Buffer.alloc(12_288, 255), [0, 12_000]],
+  ];
+  for (const [bytes, cuts] of cases) {
+    const request = streamedPost(bytes, cuts);
+    if (bytes.length <= 12_000) {
+      await assertConverted(request, bytes);
+    } else {
+      await assertForwarded(request, bytes);
+    }
+  }
+});
+
+test('reassembles arbitrary streamed chunks before encoding', async () => {
+  await fc.assert(
+    fc.asyncProperty(cacheableBytes, streamCuts, async (bytes, cuts) => {
+      await assertConverted(streamedPost(bytes, cuts), bytes);
+    }),
+    { numRuns: 100 },
+  );
+});
+
+test('forwards arbitrary oversized bodies and their streamed partitions', async () => {
+  await fc.assert(
+    fc.asyncProperty(oversizedBytes, streamCuts, async (bytes, cuts) => {
+      await assertForwarded(post(bytes), bytes);
+      await assertForwarded(streamedPost(bytes, cuts), bytes);
+    }),
+    { numRuns: 100 },
+  );
+});
+
+test('uses actual body size unless Content-Length rules out conversion', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.oneof(cacheableBytes, oversizedBytes),
+      async (bytes) => {
+        const cases = [
+          {},
+          { 'content-length': String(bytes.length) },
+          { 'content-length': '0' },
+          { 'content-length': '12000' },
+          { 'content-length': 'not-a-number' },
+          { 'content-length': '-1' },
+          { 'content-length': '' },
+        ];
+        for (const headers of cases) {
+          const request = post(bytes, headers);
+          if (bytes.length <= 12_000) {
+            await assertConverted(request, bytes);
+          } else {
+            await assertForwarded(request, bytes);
+          }
+        }
+        await assertForwarded(
+          post(bytes, { 'content-length': String(bytes.length + 12_001) }),
+          bytes,
+        );
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+test('enforces the exact URL length boundary', async () => {
+  const bytes = Buffer.from([0, 255]);
+  for (const length of [16_383, 16_384, 16_385]) {
+    const endpoint = endpointWithUrlLength(bytes, length);
+    const expected = new URL(`https://${endpoint}`);
+    expected.searchParams.set('dns', bytes.toString('base64url'));
+    assert.equal(expected.href.length, length);
+    const request = post(bytes);
+    if (length <= 16_384) {
+      await assertConverted(request, bytes, endpoint);
+    } else {
+      await assertForwarded(request, bytes, endpoint);
+    }
+  }
+});
+
+test('respects the URL limit for generated endpoint paths', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      smallBytes,
+      fc.integer({ min: 16_370, max: 16_400 }),
+      async (bytes, length) => {
+        const endpoint = endpointWithUrlLength(bytes, length);
+        const request = post(bytes);
+        if (length <= 16_384) {
+          await assertConverted(request, bytes, endpoint);
+        } else {
+          await assertForwarded(request, bytes, endpoint);
+        }
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+test('normalizes compatible media types with arbitrary case and whitespace', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      smallBytes,
+      mediaTypeVariants('application/dns-message'),
+      fc.option(
+        fc.oneof(
+          mediaTypeVariants('application/dns-message'),
+          mediaTypeVariants('*/*'),
+        ),
+        { nil: undefined },
+      ),
+      async (bytes, contentType, accept) => {
+        const headers = { 'content-type': contentType };
+        if (accept !== undefined) {
+          headers.accept = accept;
+        }
+        await assertConverted(post(bytes, headers), bytes);
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+test('forwards excluded headers including empty values', async () => {
+  await fc.assert(
+    fc.asyncProperty(smallBytes, headerValue, async (bytes, value) => {
+      for (const name of [
+        'authorization',
+        'cookie',
+        'cache-control',
+        'pragma',
+      ]) {
+        await assertForwarded(post(bytes, { [name]: '' }), bytes);
+        await assertForwarded(post(bytes, { [name]: value }), bytes);
+      }
+    }),
+    { numRuns: 100 },
+  );
+});
+
+test('forwards incompatible media types and nonempty queries', async () => {
+  await fc.assert(
+    fc.asyncProperty(smallBytes, headerValue, async (bytes, value) => {
+      for (const contentType of [
+        'application/json',
+        'application/dns-message; charset=utf-8',
+        '',
+      ]) {
+        await assertForwarded(
+          post(bytes, { 'content-type': contentType }),
+          bytes,
+        );
+      }
+      for (const accept of [
+        'application/dns-json',
+        'application/dns-message, */*',
+        '',
+      ]) {
+        await assertForwarded(post(bytes, { accept }), bytes);
+      }
+      const request = new Request(
+        `https://dns.paesa.es/dns-query?q=${encodeURIComponent(value)}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/dns-message' },
+          body: bytes,
+        },
+      );
+      await assertForwarded(request, bytes);
+    }),
+    { numRuns: 100 },
+  );
+});
+
+test('forwards arbitrary bytes for every supported non-POST method', async () => {
+  await fc.assert(
+    fc.asyncProperty(smallBytes, async (bytes) => {
+      for (const method of [
+        'GET',
+        'HEAD',
+        'PUT',
+        'PATCH',
+        'DELETE',
+        'OPTIONS',
+      ]) {
+        const body = method === 'GET' || method === 'HEAD' ? undefined : bytes;
+        const request = new Request('https://dns.paesa.es/dns-query', {
+          method,
+          headers: { 'content-type': 'application/dns-message' },
+          body,
+        });
+        await assertForwarded(request, body ?? Buffer.alloc(0));
+      }
+    }),
+    { numRuns: 100 },
+  );
+});
+
+test('returns an empty 502 on synchronous and asynchronous origin failures', async () => {
+  await fc.assert(
+    fc.asyncProperty(smallBytes, async (bytes) => {
+      for (const headers of [{}, { cookie: '' }]) {
+        for (const asynchronous of [false, true]) {
+          const originalFetch = globalThis.fetch;
+          let calls = 0;
+          const response = await dispatch(post(bytes, headers), () => {
+            calls++;
+            const error = new Error('origin unavailable');
+            if (asynchronous) {
+              return Promise.reject(error);
+            }
+            throw error;
+          });
+          assert.equal(calls, 1);
+          assert.equal(response.status, 502);
+          assert.equal(await response.text(), '');
+          assert.strictEqual(globalThis.fetch, originalFetch);
+        }
+      }
+    }),
+    { numRuns: 100 },
+  );
 });
