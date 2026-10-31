@@ -19,7 +19,7 @@ jobs:
 
       - run: npm ci
       - run: npm test
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
 
       - name: Publish
         uses: cloudflare/wrangler-action@v4

@@ -17,7 +17,10 @@ On a miss, the worker fetches from the upstream DoH resolver and returns its
 response. Whether Cloudflare stores that response depends on the origin's
 cache headers.
 
-With Node.js 26, run `npm test` and `npx tsc --noEmit` to check the Worker locally.
+With Node.js 26, run `npm test` and `npm run typecheck` to check the Worker locally.
+Run `npm run types` after changing `wrangler.toml` or updating Wrangler, and commit
+the updated `worker-configuration.d.ts`. Type checking also verifies that these
+generated types are up to date.
 
 ## License
 
