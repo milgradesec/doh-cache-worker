@@ -14,9 +14,9 @@
   "author": "milgradesec <38557680+milgradesec@users.noreply.github.com>",
   "license": "MIT",
   "devDependencies": {
-    "fast-check": "^4.10.2",
-    "prettier": "^3.9.10",
+    "fast-check": "^4.10.3",
+    "prettier": "^3.10.1",
     "typescript": "^7.0.2",
-    "wrangler": "^4.158.0"
+    "wrangler": "^4.165.0"
   }
 }
