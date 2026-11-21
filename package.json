@@ -17,6 +17,6 @@
     "fast-check": "^4.10.3",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2",
-    "wrangler": "^4.165.0"
+    "wrangler": "^4.166.0"
   }
 }
