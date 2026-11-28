@@ -497,41 +497,80 @@ test('returns an empty 502 on a body read error without an origin request', asyn
 });
 
 test('preserves origin statuses, bodies, and headers after conversion or forwarding', async () => {
-  for (const status of [204, 304, 404, 429, 500, 503]) {
-    for (const converted of [true, false]) {
-      const request = post(
-        Buffer.from([0, 255]),
-        converted ? {} : { cookie: '' },
-      );
-      const bytes =
-        status === 204 || status === 304 ? null : Buffer.from([0, 255]);
-      const headers = {
-        'cache-control': 'private, max-age=60',
-        'content-type': 'application/dns-message',
-        'x-origin': 'unchanged',
-      };
-      const originResponse = new Response(bytes, { status, headers });
-      let calls = 0;
-      let outbound;
-      const response = await dispatch(request, (forwarded) => {
-        calls++;
-        outbound = forwarded;
-        return Promise.resolve(originResponse);
-      });
-      assert.equal(calls, 1);
-      assert.equal(outbound.method, converted ? 'GET' : 'POST');
-      if (!converted) {
-        assert.strictEqual(outbound, request);
-      }
-      assert.strictEqual(response, originResponse);
-      assert.equal(response.status, status);
-      assert.deepEqual([...response.headers], [...new Headers(headers)]);
-      assert.deepEqual(
-        Buffer.from(await response.arrayBuffer()),
-        bytes ?? Buffer.alloc(0),
-      );
-    }
-  }
+  const bodylessStatuses = [204, 205, 304];
+  const originStatusAndBody = fc.oneof(
+    fc.tuple(fc.constantFrom(...bodylessStatuses), fc.constant(null)),
+    fc.tuple(
+      fc.constantFrom(200, 201, 202, 400, 403, 404, 429, 500, 502, 503),
+      fc.option(smallBytes),
+    ),
+  );
+  const originHeaders = fc.record(
+    {
+      'cache-control': fc.constantFrom(
+        'private, max-age=60',
+        'public',
+        'no-store',
+      ),
+      'content-type': fc.constantFrom(
+        'application/dns-message',
+        'application/octet-stream',
+      ),
+      'x-origin': headerValue,
+    },
+    { requiredKeys: [] },
+  );
+  const exampleHeaders = {
+    'cache-control': 'private, max-age=60',
+    'content-type': 'application/dns-message',
+    'x-origin': 'unchanged',
+  };
+
+  await fc.assert(
+    fc.asyncProperty(
+      originStatusAndBody,
+      originHeaders,
+      async ([status, body], headers) => {
+        for (const converted of [true, false]) {
+          const request = post(
+            Buffer.from([0, 255]),
+            converted ? {} : { cookie: '' },
+          );
+          const originResponse = new Response(body, { status, headers });
+          let calls = 0;
+          let outbound;
+          const response = await dispatch(request, (forwarded) => {
+            calls++;
+            outbound = forwarded;
+            return Promise.resolve(originResponse);
+          });
+          assert.equal(calls, 1);
+          assert.equal(outbound.method, converted ? 'GET' : 'POST');
+          if (!converted) {
+            assert.strictEqual(outbound, request);
+          }
+          assert.strictEqual(response, originResponse);
+          assert.equal(response.status, status);
+          assert.deepEqual([...response.headers], [...new Headers(headers)]);
+          assert.equal(response.body === null, body === null);
+          assert.deepEqual(
+            new Uint8Array(await response.arrayBuffer()),
+            body ?? new Uint8Array(),
+          );
+        }
+      },
+    ),
+    {
+      numRuns: 100,
+      examples: [
+        ...bodylessStatuses.map((status) => [[status, null], exampleHeaders]),
+        ...[404, 429, 500, 503].map((status) => [
+          [status, Uint8Array.of(0, 255)],
+          exampleHeaders,
+        ]),
+      ],
+    },
+  );
 });
 
 test('preserves streamed boundary bytes across repeated cuts', async () => {
